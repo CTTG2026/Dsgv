@@ -71,6 +71,10 @@ td.c-name{font-weight:600;white-space:nowrap}
 td.c-name small{display:block;color:var(--muted);font-weight:400;font-size:12.5px}
 td.c-date,td.c-cccd{white-space:nowrap;font-variant-numeric:tabular-nums}
 td.c-del{width:48px;text-align:center}
+.c-xml{text-align:center!important;width:84px}
+.tick,.notick{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;border:2px solid var(--gold-deep);font-weight:800;font-size:14px;line-height:1}
+.tick{background:var(--gold-deep);color:#fff}
+.notick{background:#fff}
 .del{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:6px;color:var(--muted);display:inline-flex}
 .del:hover{background:var(--danger-soft);color:var(--danger)}
 .pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:12.5px;font-weight:600;white-space:nowrap}
@@ -163,9 +167,9 @@ dialog::backdrop{background:rgba(40,25,5,.55)}
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>Hình ảnh</th><th>Họ tên</th><th>Ngày sinh</th><th>Số CCCD</th><th>Ngày hết hạn GPLX</th><th>GV dạy LX hạng</th><th><span class="sr" style="position:absolute;left:-9999px">Xóa</span></th>
+        <th>Hình ảnh</th><th>Họ tên</th><th>Ngày sinh</th><th>Số CCCD</th><th>Ngày hết hạn GPLX</th><th>GV dạy LX hạng</th><th class="c-xml">Đã nhập</th><th><span class="sr" style="position:absolute;left:-9999px">Xóa</span></th>
       </tr></thead>
-      <tbody id="tbody"><tr><td colspan="7" class="empty">Đang tải danh sách…</td></tr></tbody>
+      <tbody id="tbody"><tr><td colspan="8" class="empty">Đang tải danh sách…</td></tr></tbody>
     </table>
   </div>
 </main>
@@ -378,6 +382,7 @@ function gplxStatus(t) {
 }
 const imgSrc = s => !s ? '' : s.startsWith('data:') ? s : 'data:image/jpeg;base64,' + s;
 const notInLatest = t => S.latestImport && t.MaGiaoDich && t.MaGiaoDich !== 'NHAP_TAY' && t.MaGiaoDich !== S.latestImport;
+const fromXml = t => !!t.MaGiaoDich && t.MaGiaoDich !== 'NHAP_TAY';
 const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 let toastTimer;
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2800); }
@@ -390,7 +395,7 @@ async function load() {
     S.latestImport = j.latestImport || '';
     renderAlerts(); renderTable();
   } catch (e) {
-    $('#tbody').innerHTML = `<tr><td colspan="7" class="empty">Không tải được danh sách: ${esc(e.message)}. Kiểm tra API_URL và quyền truy cập của Web App.</td></tr>`;
+    $('#tbody').innerHTML = `<tr><td colspan="8" class="empty">Không tải được danh sách: ${esc(e.message)}. Kiểm tra API_URL và quyền truy cập của Web App.</td></tr>`;
   }
 }
 
@@ -414,8 +419,8 @@ const TRASH = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" strok
 function renderTable() {
   const rows = filtered();
   $('#count').textContent = S.q ? `Tìm thấy ${rows.length} / ${S.items.length} giáo viên` : `${S.items.length} giáo viên`;
-  if (!S.items.length) { $('#tbody').innerHTML = '<tr><td colspan="7" class="empty">Chưa có giáo viên nào. Bấm "Thêm DS giáo viên" để tải file XML của Sở, hoặc nút + để nhập tay.</td></tr>'; return; }
-  if (!rows.length) { $('#tbody').innerHTML = '<tr><td colspan="7" class="empty">Không tìm thấy giáo viên phù hợp. Kiểm tra lại tên, mã GV hoặc số CCCD.</td></tr>'; return; }
+  if (!S.items.length) { $('#tbody').innerHTML = '<tr><td colspan="8" class="empty">Chưa có giáo viên nào. Bấm "Thêm DS giáo viên" để tải file XML của Sở, hoặc nút + để nhập tay.</td></tr>'; return; }
+  if (!rows.length) { $('#tbody').innerHTML = '<tr><td colspan="8" class="empty">Không tìm thấy giáo viên phù hợp. Kiểm tra lại tên, mã GV hoặc số CCCD.</td></tr>'; return; }
   $('#tbody').innerHTML = rows.map(t => {
     const s = gplxStatus(t);
     const hh = t.NgayHetHanGPLX ? fmtDate(t.NgayHetHanGPLX) + (s.lv === 'soon' || s.lv === 'expired' ? ` <span class="pill ${s.cls}">${esc(s.text)}</span>` : '') : '';
@@ -426,6 +431,7 @@ function renderTable() {
       <td class="c-cccd">${esc(t.SoCCCD)}</td>
       <td class="c-date">${hh}</td>
       <td>${esc(t.CacHangDuocDT)}</td>
+      <td class="c-xml">${fromXml(t) ? '<span class="tick" title="Nhập từ file XML của Sở">✓</span>' : '<span class="notick" title="Nhập tay"></span>'}</td>
       <td class="c-del"><button class="del" data-del="${esc(t.MaGV)}" aria-label="Xóa ${esc(t.HoTen)}" title="Xóa">${TRASH}</button></td>
     </tr>`;
   }).join('');
@@ -435,10 +441,12 @@ function renderTable() {
 const val = v => v ? esc(v) : '<span class="missing">Chưa có</span>';
 async function openDetail(ma) {
   const pub = S.items.find(x => x.MaGV === ma); if (!pub) return;
-  const pw = await askPassword({ hint: `Cần mật khẩu admin để xem thông tin chi tiết của ${pub.HoTen}.` });
+  // Lần nào bấm xem cũng phải nhập mật khẩu admin
+  const pw = await askPassword({ hint: `Cần mật khẩu admin để xem thông tin chi tiết của ${pub.HoTen}.`, remember: false });
   if (!pw) return;
+  S.pw = pw; // dùng tiếp cho nút Chỉnh sửa trong bảng này
   let t;
-  try { t = S.full[ma] || await api.detail(ma, pw); S.full[ma] = t; }
+  try { t = await api.detail(ma, pw); S.full[ma] = t; }
   catch (err) { forgetPwIfWrong(err); toast('Không mở được: ' + err.message); return; }
   const s = gplxStatus(t);
   const kv = pairs => `<dl class="kv">${pairs.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
